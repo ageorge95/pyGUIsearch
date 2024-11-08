@@ -12,6 +12,8 @@ class FileManagerApp:
         self.root = root
         self.root.title("pyGUIsearch")
         self.root.geometry("1200x600")
+        icon = tk.PhotoImage(file="icon.png")
+        self.root.iconphoto(True, icon)
 
         self.folder_path = ""
         self.filter_in_containing = ""
