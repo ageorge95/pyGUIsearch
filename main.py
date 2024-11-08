@@ -5,6 +5,7 @@ import shutil
 from datetime import datetime
 from tkinter import ttk
 from tkinter import PhotoImage
+from threading import Thread
 
 
 class FileManagerApp:
@@ -30,8 +31,8 @@ class FileManagerApp:
         self.create_widgets()
 
     def create_widgets(self):
-        self.search_button = tk.Button(self.root, text="Select Folder", command=self.select_folder)
-        self.search_button.pack(pady=10)
+        self.select_folder_button = tk.Button(self.root, text="Select Folder", command=self.select_folder)
+        self.select_folder_button.pack(pady=10)
 
         # Create a frame to hold the filter in filter
         self.search_filter_in_frame = tk.Frame(self.root)
@@ -114,7 +115,7 @@ class FileManagerApp:
             messagebox.showinfo("Folder Selected", f"Selected folder: {self.folder_path}")
             self.root.title('pyGUIsearch: ' + self.folder_path)
 
-    def search_files(self):
+    def _search_files_slave(self):
         self.filter_in_containing = self.filter_in_entry.get().strip()
         self.filter_out_containing = self.filter_out_entry.get().strip()
         self.search_type = self.search_type_var.get()
@@ -142,6 +143,35 @@ class FileManagerApp:
             self.treeview.insert("", "end", values=(item['name'], item['path'], creation_time, size_mb))
 
         self.update_column_icons()
+
+        messagebox.showinfo("Search ended", "Searching done !")
+        self.select_folder_button.config(state="normal")
+        self.search_files_button.config(state="normal")
+        self.copy_button.config(state="normal")
+        self.move_button.config(state="normal")
+        self.delete_button.config(state="normal")
+        self.filter_in_entry.config(state="normal")
+        self.filter_out_entry.config(state="normal")
+        self.files_radio.config(state="normal")
+        self.folders_radio.config(state="normal")
+        self.both_radio.config(state="normal")
+
+    def search_files(self):
+        messagebox.showinfo("Search started", "GUI disabled while the search is ongoing.")
+        self.select_folder_button.config(state="disabled")
+        self.search_files_button.config(state="disabled")
+        self.copy_button.config(state="disabled")
+        self.move_button.config(state="disabled")
+        self.delete_button.config(state="disabled")
+        self.filter_in_entry.config(state="disabled")
+        self.filter_out_entry.config(state="disabled")
+        self.files_radio.config(state="disabled")
+        self.folders_radio.config(state="disabled")
+        self.both_radio.config(state="disabled")
+
+
+        t = Thread(target=self._search_files_slave)
+        t.start()
 
     def get_items(self, folder):
         item_list = []
