@@ -116,8 +116,8 @@ class FileManagerApp:
             self.root.title('pyGUIsearch: ' + self.folder_path)
 
     def _search_files_slave(self):
-        self.filter_in_containing = self.filter_in_entry.get().strip()
-        self.filter_out_containing = self.filter_out_entry.get().strip()
+        self.filter_in_containing = self.filter_in_entry.get().strip().lower()
+        self.filter_out_containing = self.filter_out_entry.get().strip().lower()
         self.search_type = self.search_type_var.get()
 
         if not self.folder_path:
