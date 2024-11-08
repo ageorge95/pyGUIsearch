@@ -19,6 +19,7 @@ class FileManagerApp:
         self.folder_path = ""
         self.filter_in_containing = ""
         self.filter_out_containing = ""
+        self.cached_items = []
         self.search_type = "Files"  # Default search type is files
         self.sort_column = "Creation Date"  # Default sorting column
         self.sort_reverse = False  # Sorting direction
@@ -115,7 +116,8 @@ class FileManagerApp:
             messagebox.showinfo("Folder Selected", f"Selected folder: {self.folder_path}")
             self.root.title('pyGUIsearch: ' + self.folder_path)
 
-    def _search_files_slave(self):
+    def _search_files_slave(self,
+                            return_cache):
         self.filter_in_containing = self.filter_in_entry.get().strip().lower()
         self.filter_out_containing = self.filter_out_entry.get().strip().lower()
         self.search_type = self.search_type_var.get()
@@ -125,7 +127,8 @@ class FileManagerApp:
             return
 
         self.treeview.delete(*self.treeview.get_children())  # Clear previous results
-        items = self.get_items(self.folder_path)
+        items = self.get_items(self.folder_path,
+                               return_cache)
 
         # Sort items based on the selected column and order
         if self.sort_column == "Creation Date":
@@ -156,7 +159,8 @@ class FileManagerApp:
         self.folders_radio.config(state="normal")
         self.both_radio.config(state="normal")
 
-    def search_files(self):
+    def search_files(self,
+                     return_cache=False):
         messagebox.showinfo("Search started", "GUI disabled while the search is ongoing.")
         self.select_folder_button.config(state="disabled")
         self.search_files_button.config(state="disabled")
@@ -170,10 +174,16 @@ class FileManagerApp:
         self.both_radio.config(state="disabled")
 
 
-        t = Thread(target=self._search_files_slave)
+        t = Thread(target=self._search_files_slave,
+                   args=(return_cache,))
         t.start()
 
-    def get_items(self, folder):
+    def get_items(self,
+                  folder,
+                  return_cache):
+
+        if return_cache: return self.cached_items
+
         item_list = []
         for root, dirs, files in os.walk(folder):
             # Add folders to the list if "Folders" or "Both" is selected
@@ -208,6 +218,7 @@ class FileManagerApp:
                                              "size": size
                                          })
 
+        self.cached_items = item_list
         return item_list
 
     def sort_column_click(self, column):
@@ -218,7 +229,7 @@ class FileManagerApp:
             self.sort_column = column
             self.sort_reverse = False  # Default to ascending for new columns
 
-        self.search_files()  # Refresh the file list with new sorting order
+        self.search_files(return_cache=True)  # Refresh the file list with new sorting order
 
     def update_column_icons(self):
         """Update column icons based on the sorted column and direction."""
