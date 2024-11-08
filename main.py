@@ -21,7 +21,7 @@ class FileManagerApp:
         self.filter_out_containing = ""
         self.cached_items = []
         self.search_type = "Files"  # Default search type is files
-        self.sort_column = "Creation Date"  # Default sorting column
+        self.sort_column = "Name"  # Default sorting column
         self.sort_reverse = False  # Sorting direction
 
         # Load icons for sorting from image files
@@ -147,7 +147,7 @@ class FileManagerApp:
 
         self.update_column_icons()
 
-        messagebox.showinfo("Search ended", "Searching done !")
+        if not return_cache: messagebox.showinfo("Search ended", "Searching done !")
         self.select_folder_button.config(state="normal")
         self.search_files_button.config(state="normal")
         self.copy_button.config(state="normal")
@@ -161,7 +161,7 @@ class FileManagerApp:
 
     def search_files(self,
                      return_cache=False):
-        messagebox.showinfo("Search started", "GUI disabled while the search is ongoing.")
+        if not return_cache: messagebox.showinfo("Search started", "GUI disabled while the search is ongoing.")
         self.select_folder_button.config(state="disabled")
         self.search_files_button.config(state="disabled")
         self.copy_button.config(state="disabled")
