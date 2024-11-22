@@ -5,9 +5,9 @@ from datetime import datetime
 from PySide6.QtWidgets import (QHBoxLayout, QMessageBox, QAbstractItemView,
                                QApplication, QWidget, QVBoxLayout, QPushButton, QFileDialog,
                                QLineEdit, QLabel, QRadioButton, QButtonGroup,
-                               QTableWidget, QTableWidgetItem, QHeaderView, QFrame)
-from PySide6.QtCore import Qt, QThread, Signal, QMetaObject, Q_ARG
-from PySide6.QtGui import QDragEnterEvent, QDropEvent, QIcon
+                               QTableWidget, QTableWidgetItem, QHeaderView)
+from PySide6.QtCore import QThread, Signal
+from PySide6.QtGui import QIcon
 
 def get_running_path(relative_path):
     if '_internal' in os.listdir():
