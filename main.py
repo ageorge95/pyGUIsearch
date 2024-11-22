@@ -1,331 +1,255 @@
-import tkinter as tk
-from tkinter import filedialog, messagebox
+import sys
 import os
 import shutil
 from datetime import datetime
-from tkinter import ttk
-from tkinter import PhotoImage
-from threading import Thread
+from PySide6.QtWidgets import (QHBoxLayout, QMessageBox, QAbstractItemView,
+                               QApplication, QWidget, QVBoxLayout, QPushButton, QFileDialog,
+                               QLineEdit, QLabel, QRadioButton, QButtonGroup,
+                               QTableWidget, QTableWidgetItem, QHeaderView, QFrame)
+from PySide6.QtCore import Qt, QThread, Signal, QMetaObject, Q_ARG
 
+class Worker(QThread):
+    # Signals to notify the GUI thread
+    update_items_signal = Signal(list)
+    finished_signal = Signal()
 
-class FileManagerApp:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("pyGUIsearch")
-        self.root.geometry("1200x600")
-        icon = tk.PhotoImage(file="icon.png")
-        self.root.iconphoto(True, icon)
-
-        self.folder_path = ""
-        self.filter_in_containing = ""
-        self.filter_out_containing = ""
+    def __init__(self, folder_path, filter_in, filter_out, search_type):
+        super().__init__()
+        self.folder_path = folder_path
+        self.filter_in = filter_in
+        self.filter_out = filter_out
+        self.search_type = search_type
         self.cached_items = []
-        self.search_type = "Files"  # Default search type is files
-        self.sort_column = "Name"  # Default sorting column
-        self.sort_reverse = False  # Sorting direction
 
-        # Load icons for sorting from image files
-        self.up_arrow = PhotoImage(file="up_arrow.png")  # Ensure the file exists
-        self.down_arrow = PhotoImage(file="down_arrow.png")  # Ensure the file exists
+    def run(self):
+        items = self.get_items(self.folder_path)
+        self.update_items_signal.emit(items)  # Emit signal to update GUI with the items
+        self.finished_signal.emit()
 
-        # GUI Elements
-        self.create_widgets()
-
-    def create_widgets(self):
-        self.select_folder_button = tk.Button(self.root, text="Select Folder", command=self.select_folder)
-        self.select_folder_button.pack(pady=10)
-
-        # Create a frame to hold the filter in filter
-        self.search_filter_in_frame = tk.Frame(self.root)
-        self.search_filter_in_frame.pack(pady=5)
-
-        # Add the labels and entries for filter in filter
-        self.filter_in_label = tk.Label(self.search_filter_in_frame, text="Filter IN items containing (e.g. .txt, .rrec):")
-        self.filter_in_label.pack(side=tk.LEFT, padx=5)
-
-        self.filter_in_entry = tk.Entry(self.search_filter_in_frame)
-        self.filter_in_entry.pack(side=tk.LEFT, padx=5)
-
-        # Create a frame to hold the filter out filter
-        self.search_filter_out_frame = tk.Frame(self.root)
-        self.search_filter_out_frame.pack(pady=5)
-
-        self.filter_out_label = tk.Label(self.search_filter_out_frame, text="Filter OUT items containing (e.g. .txt, .rrec):")
-        self.filter_out_label.pack(side=tk.LEFT, padx=5)
-
-        self.filter_out_entry = tk.Entry(self.search_filter_out_frame)
-        self.filter_out_entry.pack(side=tk.LEFT, padx=5)
-
-        # Radio buttons for selecting search type (Files, Folders, or Both)
-        self.search_type_var = tk.StringVar(value="Files")
-
-        # Create a frame to hold the radio buttons
-        self.radio_frame = tk.Frame(self.root)
-        self.radio_frame.pack(pady=5)
-
-        # Add the radio buttons to the frame
-        self.files_radio = tk.Radiobutton(self.radio_frame, text="Files", variable=self.search_type_var, value="Files")
-        self.files_radio.pack(side=tk.LEFT, padx=5)
-
-        self.folders_radio = tk.Radiobutton(self.radio_frame, text="Folders", variable=self.search_type_var,
-                                            value="Folders")
-        self.folders_radio.pack(side=tk.LEFT, padx=5)
-
-        self.both_radio = tk.Radiobutton(self.radio_frame, text="Both", variable=self.search_type_var, value="Both")
-        self.both_radio.pack(side=tk.LEFT, padx=5)
-
-        self.search_files_button = tk.Button(self.root, text="Search", command=self.search_files)
-        self.search_files_button.pack(pady=10)
-
-        # Treeview to display files with scrollbars
-        self.treeview_frame = tk.Frame(self.root)
-        self.treeview_frame.pack(fill=tk.BOTH, expand=True)
-
-        self.treeview = ttk.Treeview(self.treeview_frame, columns=("Name", "Path", "Creation Date", "Size"),
-                                     show="headings")
-        self.treeview.heading("Name", text="File Name", command=lambda: self.sort_column_click("Name"))
-        self.treeview.heading("Path", text="File Path", command=lambda: self.sort_column_click("Path"))
-        self.treeview.heading("Creation Date", text="Creation Date",
-                              command=lambda: self.sort_column_click("Creation Date"))
-        self.treeview.heading("Size", text="File Size (MB)", command=lambda: self.sort_column_click("Size"))
-        self.treeview.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-
-        # Vertical scrollbar for treeview
-        self.treeview_scroll_y = ttk.Scrollbar(self.treeview_frame, orient="vertical", command=self.treeview.yview)
-        self.treeview_scroll_y.pack(side=tk.RIGHT, fill=tk.Y)
-        self.treeview.configure(yscrollcommand=self.treeview_scroll_y.set)
-
-        # Create a frame to hold the buttons
-        self.buttons_frame = tk.Frame(self.root)
-        self.buttons_frame.pack(pady=5)
-
-        # Add the buttons to the frame
-        self.move_button = tk.Button(self.buttons_frame, text="Move Files", command=self.move_files)
-        self.move_button.pack(side=tk.LEFT, padx=5)
-
-        self.copy_button = tk.Button(self.buttons_frame, text="Copy Files", command=self.copy_files)
-        self.copy_button.pack(side=tk.LEFT, padx=5)
-
-        self.delete_button = tk.Button(self.buttons_frame, text="Delete Files", command=self.delete_files)
-        self.delete_button.pack(side=tk.LEFT, padx=5)
-
-    def select_folder(self):
-        folder_selected = filedialog.askdirectory()
-        if folder_selected:
-            self.folder_path = folder_selected
-            messagebox.showinfo("Folder Selected", f"Selected folder: {self.folder_path}")
-            self.root.title('pyGUIsearch: ' + self.folder_path)
-
-    def _search_files_slave(self,
-                            return_cache):
-        self.filter_in_containing = self.filter_in_entry.get().strip().lower()
-        self.filter_out_containing = self.filter_out_entry.get().strip().lower()
-        self.search_type = self.search_type_var.get()
-
-        if not self.folder_path:
-            messagebox.showwarning("Input Error", "Please specify a folder.")
-            return
-
-        self.treeview.delete(*self.treeview.get_children())  # Clear previous results
-        items = self.get_items(self.folder_path,
-                               return_cache)
-
-        # Sort items based on the selected column and order
-        if self.sort_column == "Creation Date":
-            items = sorted(items, key=lambda x: x['creation_time'], reverse=self.sort_reverse)
-        elif self.sort_column == "Name":
-            items = sorted(items, key=lambda x: x['name'].lower(), reverse=self.sort_reverse)
-        elif self.sort_column == "Path":
-            items = sorted(items, key=lambda x: x['path'].lower(), reverse=self.sort_reverse)
-        elif self.sort_column == "Size":
-            items = sorted(items, key=lambda x: x['size'], reverse=self.sort_reverse)
-
-        for item in items:
-            creation_time = datetime.fromtimestamp(item['creation_time']).strftime('%Y-%m-%d %H:%M:%S')
-            size_mb = round(item['size'] / (1024 * 1024), 2)  # Convert size to MB and round it
-            self.treeview.insert("", "end", values=(item['name'], item['path'], creation_time, size_mb))
-
-        self.update_column_icons()
-
-        if not return_cache: messagebox.showinfo("Search ended", "Searching done !")
-        self.select_folder_button.config(state="normal")
-        self.search_files_button.config(state="normal")
-        self.copy_button.config(state="normal")
-        self.move_button.config(state="normal")
-        self.delete_button.config(state="normal")
-        self.filter_in_entry.config(state="normal")
-        self.filter_out_entry.config(state="normal")
-        self.files_radio.config(state="normal")
-        self.folders_radio.config(state="normal")
-        self.both_radio.config(state="normal")
-
-    def search_files(self,
-                     return_cache=False):
-        if not return_cache: messagebox.showinfo("Search started", "GUI disabled while the search is ongoing.")
-        self.select_folder_button.config(state="disabled")
-        self.search_files_button.config(state="disabled")
-        self.copy_button.config(state="disabled")
-        self.move_button.config(state="disabled")
-        self.delete_button.config(state="disabled")
-        self.filter_in_entry.config(state="disabled")
-        self.filter_out_entry.config(state="disabled")
-        self.files_radio.config(state="disabled")
-        self.folders_radio.config(state="disabled")
-        self.both_radio.config(state="disabled")
-
-
-        t = Thread(target=self._search_files_slave,
-                   args=(return_cache,))
-        t.start()
-
-    def get_items(self,
-                  folder,
-                  return_cache):
-
-        if return_cache: return self.cached_items
-
+    def get_items(self, folder):
         item_list = []
         for root, dirs, files in os.walk(folder):
-            # Add folders to the list if "Folders" or "Both" is selected
             if self.search_type in ["Folders", "Both"]:
                 for folder_name in dirs:
-                    if (self.filter_in_containing in folder_name.lower() and
-                            (not self.filter_out_containing or
-                             (self.filter_out_containing and self.filter_out_containing not in folder_name.lower()))):
+                    if self.filter_in in folder_name.lower() and (not self.filter_out or self.filter_out not in folder_name.lower()):
                         folder_path = os.path.join(root, folder_name)
                         creation_time = os.path.getctime(folder_path)
-                        size = 0  # Folders usually don't have size, set it to 0
-                        item_list.append({
-                                             "name": folder_name,
-                                             "path": folder_path,
-                                             "creation_time": creation_time,
-                                             "size": size
-                                         })
-
-            # Add files to the list if "Files" or "Both" is selected
+                        size = 0
+                        item_list.append({"name": folder_name, "path": folder_path, "creation_time": creation_time, "size": size})
             if self.search_type in ["Files", "Both"]:
                 for file_name in files:
-                    if (self.filter_in_containing in file_name.lower() and
-                            (not self.filter_out_containing or
-                             (self.filter_out_containing and self.filter_out_containing not in file_name.lower()))):
+                    if self.filter_in in file_name.lower() and (not self.filter_out or self.filter_out not in file_name.lower()):
                         file_path = os.path.join(root, file_name)
                         creation_time = os.path.getctime(file_path)
-                        size = os.path.getsize(file_path)  # Get file size in bytes
-                        item_list.append({
-                                             "name": file_name,
-                                             "path": file_path,
-                                             "creation_time": creation_time,
-                                             "size": size
-                                         })
-
-        self.cached_items = item_list
+                        size = os.path.getsize(file_path)
+                        item_list.append({"name": file_name, "path": file_path, "creation_time": creation_time, "size": size})
         return item_list
 
-    def sort_column_click(self, column):
-        # Toggle the sorting direction if the same column is clicked again
-        if self.sort_column == column:
-            self.sort_reverse = not self.sort_reverse
-        else:
-            self.sort_column = column
-            self.sort_reverse = False  # Default to ascending for new columns
 
-        self.search_files(return_cache=True)  # Refresh the file list with new sorting order
+class FileManagerApp(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("pyGUIsearch")
+        self.setGeometry(100, 100, 1200, 600)
 
-    def update_column_icons(self):
-        """Update column icons based on the sorted column and direction."""
-        for col in ["Name", "Path", "Creation Date", "Size"]:
-            self.treeview.heading(col, text=col)  # Reset the text of all columns
+        # GUI components
+        self.folder_path = ""
+        self.filter_in = ""
+        self.filter_out = ""
+        self.search_type = "Files"
 
-        if self.sort_column == "Name":
-            icon = self.up_arrow if not self.sort_reverse else self.down_arrow
-            self.treeview.heading("Name", text="File Name", image=icon)
-        elif self.sort_column == "Path":
-            icon = self.up_arrow if not self.sort_reverse else self.down_arrow
-            self.treeview.heading("Path", text="File Path", image=icon)
-        elif self.sort_column == "Creation Date":
-            icon = self.up_arrow if not self.sort_reverse else self.down_arrow
-            self.treeview.heading("Creation Date", text="Creation Date", image=icon)
-        elif self.sort_column == "Size":
-            icon = self.up_arrow if not self.sort_reverse else self.down_arrow
-            self.treeview.heading("Size", text="File Size (MB)", image=icon)
+        self.init_ui()
 
-        # Keep the icons from being stretched out
-        self.treeview.heading("Name", anchor="w")
-        self.treeview.heading("Path", anchor="w")
-        self.treeview.heading("Creation Date", anchor="w")
-        self.treeview.heading("Size", anchor="w")
+    def init_ui(self):
+        layout = QVBoxLayout()
 
-    def move_files(self):
-        selected_items = self.treeview.selection()
-        if not selected_items:
-            messagebox.showwarning("No Selection", "Please select items to move.")
+        # Select Folder Button
+        self.select_folder_button = QPushButton("Select Folder", self)
+        self.select_folder_button.clicked.connect(self.select_folder)
+        layout.addWidget(self.select_folder_button)
+
+        # Filter Inputs
+        self.filter_in_label = QLabel("Filter IN items containing:")
+        self.filter_in_entry = QLineEdit(self)
+        self.filter_out_label = QLabel("Filter OUT items containing:")
+        self.filter_out_entry = QLineEdit(self)
+
+        layout.addWidget(self.filter_in_label)
+        layout.addWidget(self.filter_in_entry)
+        layout.addWidget(self.filter_out_label)
+        layout.addWidget(self.filter_out_entry)
+
+        # Search Type Radio Buttons
+        self.files_radio = QRadioButton("Files", self)
+        self.folders_radio = QRadioButton("Folders", self)
+        self.both_radio = QRadioButton("Both", self)
+
+        self.files_radio.setChecked(True)
+
+        radio_group = QButtonGroup(self)
+        radio_group.addButton(self.files_radio)
+        radio_group.addButton(self.folders_radio)
+        radio_group.addButton(self.both_radio)
+
+        layout.addWidget(self.files_radio)
+        layout.addWidget(self.folders_radio)
+        layout.addWidget(self.both_radio)
+
+        # Search Button
+        self.search_files_button = QPushButton("Search", self)
+        self.search_files_button.clicked.connect(self.search_files)
+
+        # copy/ move/ delete buttons layout
+        button_layout = QHBoxLayout()
+
+        # Add buttons to the horizontal layout
+        self.copy_button = QPushButton("Copy", self)
+        self.copy_button.clicked.connect(self.copy_items)
+        button_layout.addWidget(self.copy_button)
+
+        self.move_button = QPushButton("Move", self)
+        self.move_button.clicked.connect(self.move_items)
+        button_layout.addWidget(self.move_button)
+
+        self.delete_button = QPushButton("Delete", self)
+        self.delete_button.clicked.connect(self.delete_items)
+        button_layout.addWidget(self.delete_button)
+
+        # Add the horizontal layout to the main vertical layout
+        layout.addWidget(self.search_files_button)
+        layout.addLayout(button_layout)  # This adds the buttons on the same line
+
+        # Table to display results
+        self.table = QTableWidget(self)
+        self.table.setColumnCount(4)
+        self.table.setHorizontalHeaderLabels(["File Name", "File Path", "Creation Date", "File Size (MB)"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
+        # Make rows read-only
+        self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+
+        # Set the selection mode to select entire rows
+        self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
+
+        # set alternating rows colors
+        self.table.setAlternatingRowColors(True)
+
+        # Set a custom color for the selected rows using CSS
+        self.table.setStyleSheet("QTableView::item:selected{"
+                                 "background:rgb(135, 206, 255)}")
+
+        # enable sorting in the main table when clicking on the column names
+        self.table.setSortingEnabled(True)
+
+        layout.addWidget(self.table)
+
+        self.setLayout(layout)
+
+    def copy_items(self):
+        selected_rows = self.table.selectionModel().selectedRows()
+        if not selected_rows:
+            print("No item selected.")
             return
 
-        destination = filedialog.askdirectory()
-        if not destination:
+        # Ask for the destination folder
+        dest_folder = QFileDialog.getExistingDirectory(self, "Select Destination Folder")
+        if not dest_folder:
             return
 
-        for item in selected_items:
-            file_path = self.treeview.item(item, "values")[1]
-            try:
-                if os.path.isfile(file_path):
-                    shutil.move(file_path, destination)
-                elif os.path.isdir(file_path):
-                    shutil.move(file_path, os.path.join(destination, os.path.basename(file_path)))
-            except Exception as e:
-                messagebox.showerror("Error", f"Error moving item {file_path}: {e}")
-                continue
-        messagebox.showinfo("Success", "Items moved successfully.")
-        self.search_files()  # Refresh the file list
+        for row in selected_rows:
+            item_path = self.table.item(row.row(), 1).text()  # Get the file/folder path
+            dest_path = os.path.join(dest_folder, os.path.basename(item_path))  # Destination path
+            if os.path.isdir(item_path):
+                shutil.copytree(item_path, dest_path)  # Copy folder
+            else:
+                shutil.copy2(item_path, dest_path)  # Copy file
 
-    def copy_files(self):
-        selected_items = self.treeview.selection()
-        if not selected_items:
-            messagebox.showwarning("No Selection", "Please select items to copy.")
+        print(f"Items copied to {dest_folder}")
+
+    def move_items(self):
+        selected_rows = self.table.selectionModel().selectedRows()
+        if not selected_rows:
+            print("No item selected.")
             return
 
-        destination = filedialog.askdirectory()
-        if not destination:
+        # Ask for the destination folder
+        dest_folder = QFileDialog.getExistingDirectory(self, "Select Destination Folder")
+        if not dest_folder:
             return
 
-        for item in selected_items:
-            file_path = self.treeview.item(item, "values")[1]
-            try:
-                if os.path.isfile(file_path):
-                    shutil.copy(file_path, destination)
-                elif os.path.isdir(file_path):
-                    shutil.copytree(file_path, os.path.join(destination, os.path.basename(file_path)))
-            except Exception as e:
-                messagebox.showerror("Error", f"Error copying item {file_path}: {e}")
-                continue
-        messagebox.showinfo("Success", "Items copied successfully.")
-        self.search_files()  # Refresh the file list
+        for row in selected_rows:
+            item_path = self.table.item(row.row(), 1).text()  # Get the file/folder path
+            dest_path = os.path.join(dest_folder, os.path.basename(item_path))  # Destination path
+            if os.path.isdir(item_path):
+                shutil.move(item_path, dest_path)  # Move folder
+            else:
+                shutil.move(item_path, dest_path)  # Move file
 
-    def delete_files(self):
-        selected_items = self.treeview.selection()
-        if not selected_items:
-            messagebox.showwarning("No Selection", "Please select items to delete.")
+        print(f"Items moved to {dest_folder}")
+
+    def delete_items(self):
+        selected_rows = self.table.selectionModel().selectedRows()
+        if not selected_rows:
+            print("No item selected.")
             return
 
-        confirmation = messagebox.askyesno("Confirm Delete", "Are you sure you want to delete the selected items?")
-        if not confirmation:
+        # Confirm before deletion
+        confirm = QMessageBox.question(self, "Confirm Deletion", "Are you sure you want to delete the selected items?",
+                                       QMessageBox.Yes | QMessageBox.No)
+        if confirm == QMessageBox.No:
             return
 
-        for item in selected_items:
-            file_path = self.treeview.item(item, "values")[1]
-            try:
-                if os.path.isfile(file_path):
-                    os.remove(file_path)
-                elif os.path.isdir(file_path):
-                    shutil.rmtree(file_path)
-            except Exception as e:
-                messagebox.showerror("Error", f"Error deleting item {file_path}: {e}")
-                continue
-        messagebox.showinfo("Success", "Items deleted successfully.")
-        self.search_files()  # Refresh the file list
+        for row in selected_rows:
+            item_path = self.table.item(row.row(), 1).text()  # Get the file/folder path
+            if os.path.isdir(item_path):
+                shutil.rmtree(item_path)  # Delete folder
+            else:
+                os.remove(item_path)  # Delete file
 
+        print("Items deleted.")
 
-# Main Application
-root = tk.Tk()
-app = FileManagerApp(root)
-root.mainloop()
+    def select_folder(self):
+        folder_selected = QFileDialog.getExistingDirectory(self)
+        if folder_selected:
+            self.folder_path = folder_selected
+            self.setWindowTitle(f'pyGUIsearch: {self.folder_path}')
+
+    def search_files(self):
+        self.filter_in = self.filter_in_entry.text().strip().lower()
+        self.filter_out = self.filter_out_entry.text().strip().lower()
+        self.search_type = "Files" if self.files_radio.isChecked() else "Folders" if self.folders_radio.isChecked() else "Both"
+
+        if not self.folder_path:
+            print("Please specify a folder.")
+            return
+
+        # Disable UI during search
+        self.select_folder_button.setEnabled(False)
+        self.search_files_button.setEnabled(False)
+
+        # Start the worker thread
+        self.worker = Worker(self.folder_path, self.filter_in, self.filter_out, self.search_type)
+        self.worker.update_items_signal.connect(self.update_table)
+        self.worker.finished_signal.connect(self.search_finished)
+        self.worker.start()
+
+    def update_table(self, items):
+        self.table.setRowCount(0)  # Clear previous results
+        for item in items:
+            row_position = self.table.rowCount()
+            self.table.insertRow(row_position)
+            self.table.setItem(row_position, 0, QTableWidgetItem(item['name']))
+            self.table.setItem(row_position, 1, QTableWidgetItem(item['path']))
+            self.table.setItem(row_position, 2, QTableWidgetItem(datetime.fromtimestamp(item['creation_time']).strftime('%Y-%m-%d %H:%M:%S')))
+            self.table.setItem(row_position, 3, QTableWidgetItem(str(round(item['size'] / (1024 * 1024), 2))))  # Size in MB
+
+    def search_finished(self):
+        # Enable the UI after the search is finished
+        self.select_folder_button.setEnabled(True)
+        self.search_files_button.setEnabled(True)
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = FileManagerApp()
+    window.show()
+    sys.exit(app.exec())
