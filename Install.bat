@@ -27,9 +27,9 @@ python -m pip install -r requirements.txt
 
 echo @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 echo.
-echo pyAggregatedRssFeedReader install complete.
+echo pyGUIsearch install complete.
 echo.
-echo Run 'activate' to activate pyAggregatedRssFeedReader's Python virtual environment and
+echo Run 'activate' to activate pyGUIsearch's Python virtual environment and
 echo 'deactivate' to, well, deactivate it.
 echo.
 echo @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
