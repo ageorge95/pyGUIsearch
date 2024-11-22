@@ -156,7 +156,9 @@ class FileManagerApp(QWidget):
     def copy_items(self):
         selected_rows = self.table.selectionModel().selectedRows()
         if not selected_rows:
-            print("No item selected.")
+            QMessageBox.information(self,
+                                    "No items selected",
+                                    "No items selected, cannot continue.")
             return
 
         # Ask for the destination folder
@@ -172,12 +174,16 @@ class FileManagerApp(QWidget):
             else:
                 shutil.copy2(item_path, dest_path)  # Copy file
 
-        print(f"Items copied to {dest_folder}")
+        QMessageBox.information(self,
+                                "Operation Confirmation",
+                                f"Operation completed successfully, Items copied to {dest_folder}")
 
     def move_items(self):
         selected_rows = self.table.selectionModel().selectedRows()
         if not selected_rows:
-            print("No item selected.")
+            QMessageBox.information(self,
+                                    "No items selected",
+                                    "No items selected, cannot continue.")
             return
 
         # Ask for the destination folder
@@ -193,12 +199,16 @@ class FileManagerApp(QWidget):
             else:
                 shutil.move(item_path, dest_path)  # Move file
 
-        print(f"Items moved to {dest_folder}")
+        QMessageBox.information(self,
+                                "Operation Confirmation",
+                                f"Operation completed successfully, Items moved to {dest_folder}")
 
     def delete_items(self):
         selected_rows = self.table.selectionModel().selectedRows()
         if not selected_rows:
-            print("No item selected.")
+            QMessageBox.information(self,
+                                    "No items selected",
+                                    "No items selected, cannot continue.")
             return
 
         # Confirm before deletion
@@ -214,7 +224,9 @@ class FileManagerApp(QWidget):
             else:
                 os.remove(item_path)  # Delete file
 
-        print("Items deleted.")
+        QMessageBox.information(self,
+                                "Operation Confirmation",
+                                "Operation completed successfully, Items deleted")
 
     def select_folder(self):
         folder_selected = QFileDialog.getExistingDirectory(self)
