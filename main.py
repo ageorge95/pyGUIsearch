@@ -56,7 +56,7 @@ class Worker(QThread):
 class FileManagerApp(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("pyGUIsearch")
+        self.setWindowTitle("pyGUIsearch v" + open(get_running_path('version.txt')).read())
         self.setGeometry(100, 100, 1200, 600)
         self.setWindowIcon(QIcon(get_running_path('icon.ico')))
 
