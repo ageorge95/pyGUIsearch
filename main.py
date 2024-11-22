@@ -7,6 +7,13 @@ from PySide6.QtWidgets import (QHBoxLayout, QMessageBox, QAbstractItemView,
                                QLineEdit, QLabel, QRadioButton, QButtonGroup,
                                QTableWidget, QTableWidgetItem, QHeaderView, QFrame)
 from PySide6.QtCore import Qt, QThread, Signal, QMetaObject, Q_ARG
+from PySide6.QtGui import QDragEnterEvent, QDropEvent, QIcon
+
+def get_running_path(relative_path):
+    if '_internal' in os.listdir():
+        return os.path.join('_internal', relative_path)
+    else:
+        return relative_path
 
 class Worker(QThread):
     # Signals to notify the GUI thread
@@ -51,6 +58,7 @@ class FileManagerApp(QWidget):
         super().__init__()
         self.setWindowTitle("pyGUIsearch")
         self.setGeometry(100, 100, 1200, 600)
+        self.setWindowIcon(QIcon(get_running_path('icon.ico')))
 
         # GUI components
         self.folder_path = ""
